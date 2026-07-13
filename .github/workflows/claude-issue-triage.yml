@@ -1,0 +1,45 @@
+name: Claude Issue Triage
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  triage:
+    if: ${{ !github.event.issue.pull_request && github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude issue triage
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowed-tools "Bash(gh label list),Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*)"'
+          prompt: |
+            Eres el asistente de triage de issues de este repositorio (un Tetris en JS vanilla).
+            Analiza el issue #${{ github.event.issue.number }} del repo ${{ github.repository }}.
+
+            Pasos:
+            1. Lee el issue: gh issue view ${{ github.event.issue.number }}
+            2. Lista labels disponibles: gh label list
+            3. Asigna SOLO labels que ya existan (no crees labels nuevas) con:
+               gh issue edit ${{ github.event.issue.number }} --add-label "<label>"
+            4. Publica UN comentario de diagnóstico en español con:
+               gh issue comment ${{ github.event.issue.number }} --edit-last --create-if-none --body "..."
+
+            El comentario debe empezar con el marcador "🔍 **Diagnóstico automático**" e incluir:
+            - **Resumen**: qué pide o reporta el issue en 1-2 frases.
+            - **Tipo**: bug / mejora / duda / documentación.
+            - **Causa probable / contexto**: dónde vive esto en el código (game.js, index.html, style.css).
+            - **Archivos y funciones probablemente afectadas**.
+            - **Enfoque de solución sugerido**: pasos de alto nivel para implementarlo.
+
+            Escribe todo en español. No modifiques el cuerpo del issue. Sé conciso y técnico.
